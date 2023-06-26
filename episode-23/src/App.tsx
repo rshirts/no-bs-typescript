@@ -1,4 +1,5 @@
-import React, { useCallback, PropsWithChildren, useState, useEffect, useReducer, useRef } from 'react';
+import React, { useCallback, PropsWithChildren, useRef } from 'react';
+import { useTodos } from './useTodos';
 import './App.css';
 
 const Heading = ({ title }: { title: string }) => (
@@ -12,35 +13,6 @@ const Box: React.FunctionComponent<PropsWithChildren> = ({ children }) => (
   }}>{children}</div>
 )
 
-
-const List: React.FunctionComponent<{
-  items: string[];
-  onClick?: (item: string) => void;
-}> = ({ items, onClick }) => (
-  <ul>
-    {items.map((item, index) => (
-      <li key={index} onClick={() => onClick?.(item)}>{item}</li>
-    ))}
-  </ul>
-)
-
-interface Payload {
-  text: string
-}
-interface Todo {
-  id: number;
-  done: boolean;
-  text: string;
-}
-
-type ActionType = {
-  type: "ADD",
-  text: string
-} | {
-  type: "REMOVE",
-  id: number
-}
-
 const Button: React.FunctionComponent<React.DetailedHTMLProps<React.ButtonHTMLAttributes<HTMLButtonElement>, HTMLButtonElement>> & {
   title?: string;
 } = (
@@ -52,79 +24,62 @@ const Button: React.FunctionComponent<React.DetailedHTMLProps<React.ButtonHTMLAt
   fontSize: "Large"
 }}>{title ?? children}</button>
 
-const useNumber = (initialValue: number) => useState<number>(initialValue);
-
-type UseNumberValue = ReturnType<typeof useNumber>[0];
-type UseNumberSetValue = ReturnType<typeof useNumber>[1];
-
-
-const Incrementer: React.FunctionComponent<{
-  value: UseNumberValue;
-  setValue: UseNumberSetValue
-}> = ({ value, setValue }) => (
-  <Button onClick={() => setValue(value + 1)} title={`Add - ${value}`}></Button>
-)
-
-
-
-
+function UL<T>({
+  items, 
+  render, 
+  itemClick,
+  children // not using here just how you would do it
+}: React.PropsWithChildren< // <-- You just wrap this around the generic types
+  React.DetailedHTMLProps<
+    React.HTMLAttributes<HTMLUListElement>, 
+    HTMLUListElement
+  > & {
+    items: T[];  
+    render: (item: T)=> React.ReactNode;
+    itemClick: (item: T) => void;
+  }
+>) {
+  return (
+    <ul>
+      {items.map((item, index) => (
+        <li key={index} onClick={() => itemClick(item)}>{render(item)}</li>
+      ))}
+    </ul>
+  )
+}
 
 function App() {
-  const onListClick = useCallback((item: string) => { alert(item) }, []);
 
-  useEffect(() => {
-    fetch("/data.json")
-      .then(resp => resp.json())
-      .then(data => setPayload(data))
-  }, []);
+  const {todos, addTodo, removeTodo} = useTodos([
+    {id: 0, text: "Hey there", done: false}
+  ])
 
-  const [payload, setPayload] = useState<Payload | null>(null)
-
-  const [todos, dispatch] = useReducer((state: Todo[], action: ActionType) => {
-    switch (action.type) {
-      case "ADD":
-        return [
-          ...state,
-          {
-            id: state.length,
-            text: action.text,
-            done: false
-          }
-        ]
-      case "REMOVE":
-        return state.filter(({ id }) => id !== action.id);
-      default:
-        throw new Error()
-    }
-  }, [])
 
   const newTodoRef = useRef<HTMLInputElement>(null);
 
   const onAddTodo = useCallback(() => {
     if (newTodoRef.current) {
-      dispatch({ type: "ADD", text: newTodoRef.current.value })
+      addTodo(newTodoRef.current.value)
       newTodoRef.current.value = "";
     }
-  }, [])
-
-  const [value, setValue] = useNumber(0);
+  }, [addTodo])
 
   return (
     <div className="App">
       <Heading title="Introduction" />
       <Box>Hello there</Box>
-      <List items={["one", "two", "three"]} onClick={onListClick} />
-      <Box>{JSON.stringify(payload)}</Box>
-
-      <Incrementer value={value} setValue={setValue} />
 
       <Heading title="Todos" />
-      {todos.map(todo => (
-        <div key={todo.id}>
+      <UL 
+        items={todos}
+        itemClick={(item) => alert(item.id)}
+        render={(todo) => (
+          <>
           {todo.text}
-          <Button title={"Remove"} onClick={() => dispatch({ type: "REMOVE", id: todo.id })}></Button>
-        </div>
-      ))}
+          <Button title={"Remove"} onClick={() => removeTodo(todo.id)}></Button>
+          </>
+        )}
+      />
       <div>
         <input type="text" ref={newTodoRef} />
         <Button onClick={onAddTodo}>Add Todo</Button>
